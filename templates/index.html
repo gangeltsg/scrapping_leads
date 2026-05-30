@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Scraper de Leads · F5Bot</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: { DEFAULT: '#6366f1', dark: '#4f46e5', light: '#a5b4fc' }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="min-h-full bg-gray-950 text-gray-100 font-sans">
+
+<!-- ── Header ──────────────────────────────────────────────────── -->
+<header class="bg-gray-900 border-b border-gray-800 shadow-lg">
+  <div class="max-w-6xl mx-auto px-6 py-4 flex items-center gap-3">
+    <svg class="w-7 h-7 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+      <path stroke-linecap="round" stroke-linejoin="round"
+        d="M12 2a10 10 0 1 1 0 20A10 10 0 0 1 12 2zm0 0v4m0 14v-4m10-6h-4M6 12H2m14.243-6.243-2.829 2.829M8.586 15.414l-2.829 2.829m12.728 0-2.829-2.829M8.586 8.586 5.757 5.757" />
+    </svg>
+    <h1 class="text-xl font-semibold tracking-tight">Scraper de Leads</h1>
+  </div>
+</header>
+
+<!-- ── Tabs ─────────────────────────────────────────────────────── -->
+<div class="bg-gray-900 border-b border-gray-800">
+  <div class="max-w-6xl mx-auto px-6 flex gap-1">
+    <button id="tab-btn-scraper" onclick="switchTab('scraper')"
+      class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-brand text-brand transition-colors">
+      Scraper Web
+    </button>
+    <button id="tab-btn-f5bot" onclick="switchTab('f5bot')"
+      class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-300 transition-colors">
+      Monitor F5Bot
+      <span class="ml-1.5 inline-block text-xs bg-indigo-900/60 text-indigo-300 border border-indigo-700/40 px-1.5 py-0.5 rounded-full">Reddit · HN</span>
+    </button>
+  </div>
+</div>
+
+<!-- ── Main ─────────────────────────────────────────────────────── -->
+<main class="max-w-6xl mx-auto px-6 py-10 space-y-8">
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- TAB: Scraper Web                                              -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<div id="tab-scraper">
+
+  <!-- Input card -->
+  <section class="bg-gray-900 rounded-2xl border border-gray-800 shadow-xl p-6 space-y-6">
+    <h2 class="text-lg font-semibold text-gray-200">Configurar búsqueda</h2>
+
+    <div class="grid md:grid-cols-2 gap-6">
+      <!-- Domains -->
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-gray-400" for="domains">
+          Dominios <span class="text-gray-600">(uno por línea)</span>
+        </label>
+        <textarea
+          id="domains"
+          rows="8"
+          placeholder="ejemplo.com&#10;otrodominio.mx&#10;https://sitio.org"
+          class="w-full rounded-xl bg-gray-800 border border-gray-700 text-gray-100 placeholder-gray-600
+                 text-sm px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-brand
+                 focus:border-transparent transition"
+        ></textarea>
+      </div>
+
+      <!-- Keywords -->
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-gray-400" for="keywords">
+          Keywords <span class="text-gray-600">(uno por línea)</span>
+        </label>
+        <textarea
+          id="keywords"
+          rows="8"
+          placeholder="contacto&#10;ventas&#10;cotización&#10;WhatsApp"
+          class="w-full rounded-xl bg-gray-800 border border-gray-700 text-gray-100 placeholder-gray-600
+                 text-sm px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-brand
+                 focus:border-transparent transition"
+        ></textarea>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="flex flex-wrap items-center gap-3">
+      <button
+        id="btn-scrape"
+        onclick="startScrape()"
+        class="inline-flex items-center gap-2 bg-brand hover:bg-brand-dark active:scale-95
+               text-white font-medium px-6 py-2.5 rounded-xl transition-all shadow-md shadow-indigo-900/40"
+      >
+        <svg id="btn-icon" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M12 5l7 7-7 7" />
+        </svg>
+        <span id="btn-label">Iniciar scraping</span>
+      </button>
+
+      <button
+        onclick="clearAll()"
+        class="inline-flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-gray-300
+               font-medium px-5 py-2.5 rounded-xl transition-all border border-gray-700"
+      >
+        Limpiar
+      </button>
+
+      <!-- Status badge -->
+      <div id="status-badge" class="hidden ml-auto"></div>
+    </div>
+  </section>
+
+  <!-- Progress bar -->
+  <div id="progress-wrap" class="hidden space-y-2">
+    <p class="text-sm text-gray-400" id="progress-label">Procesando…</p>
+    <div class="w-full bg-gray-800 rounded-full h-2 overflow-hidden">
+      <div id="progress-bar" class="h-2 bg-brand rounded-full transition-all duration-500" style="width:0%"></div>
+    </div>
+  </div>
+
+  <!-- Error alert -->
+  <div id="error-box" class="hidden bg-red-950 border border-red-700 text-red-300 rounded-xl px-5 py-4 text-sm"></div>
+
+  <!-- Results section -->
+  <section id="results-section" class="hidden space-y-4">
+    <div class="flex items-center justify-between">
+      <h2 class="text-lg font-semibold text-gray-200">Resultados</h2>
+      <div class="flex gap-3">
+        <button
+          onclick="filterResults('all')"
+          id="filter-all"
+          class="filter-btn text-xs px-3 py-1.5 rounded-lg bg-brand text-white font-medium transition"
+        >Todos</button>
+        <button
+          onclick="filterResults('match')"
+          id="filter-match"
+          class="filter-btn text-xs px-3 py-1.5 rounded-lg bg-gray-800 text-gray-400 font-medium hover:bg-gray-700 transition"
+        >Con coincidencias</button>
+        <button
+          onclick="filterResults('none')"
+          id="filter-none"
+          class="filter-btn text-xs px-3 py-1.5 rounded-lg bg-gray-800 text-gray-400 font-medium hover:bg-gray-700 transition"
+        >Sin coincidencias</button>
+        <button
+          onclick="exportCSV()"
+          class="text-xs px-3 py-1.5 rounded-lg bg-gray-800 text-gray-400 font-medium hover:bg-gray-700 transition border border-gray-700"
+        >↓ CSV</button>
+      </div>
+    </div>
+
+    <!-- Summary stats -->
+    <div id="stats" class="grid grid-cols-2 sm:grid-cols-4 gap-3"></div>
+
+    <!-- Table -->
+    <div class="overflow-x-auto rounded-2xl border border-gray-800">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-900 text-gray-400 text-left">
+          <tr>
+            <th class="px-4 py-3 font-medium w-8">#</th>
+            <th class="px-4 py-3 font-medium">Dominio</th>
+            <th class="px-4 py-3 font-medium">Estado HTTP</th>
+            <th class="px-4 py-3 font-medium">Keywords encontrados</th>
+            <th class="px-4 py-3 font-medium">Contexto</th>
+            <th class="px-4 py-3 font-medium">Error</th>
+          </tr>
+        </thead>
+        <tbody id="results-body" class="divide-y divide-gray-800 bg-gray-900/60"></tbody>
+      </table>
+    </div>
+  </section>
+
+</div><!-- /tab-scraper -->
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- TAB: Monitor F5Bot                                            -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<div id="tab-f5bot" class="hidden space-y-8">
+
+  <!-- Config card -->
+  <section class="bg-gray-900 rounded-2xl border border-gray-800 shadow-xl p-6 space-y-6">
+    <div class="flex items-start justify-between gap-4 flex-wrap">
+      <div>
+        <h2 class="text-lg font-semibold text-gray-200">Monitor de menciones · F5Bot</h2>
+        <p class="text-sm text-gray-500 mt-1">
+          Busca en Reddit y Hacker News conversaciones recientes donde se mencionan tus keywords — igual que F5Bot, pero en tiempo real y dentro de tu app.
+        </p>
+      </div>
+      <span class="inline-flex items-center gap-1.5 text-xs bg-green-900/30 text-green-400 border border-green-700/30 px-3 py-1.5 rounded-full font-medium">
+        Sin API key · Gratis
+      </span>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-6">
+      <!-- Keywords -->
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-gray-400" for="f5-keywords">
+          Keywords a monitorear <span class="text-gray-600">(uno por línea)</span>
+        </label>
+        <textarea
+          id="f5-keywords"
+          rows="8"
+          placeholder="mi producto&#10;nombre de competidor&#10;necesito software de&#10;recomiendan agencia"
+          class="w-full rounded-xl bg-gray-800 border border-gray-700 text-gray-100 placeholder-gray-600
+                 text-sm px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-brand
+                 focus:border-transparent transition"
+        ></textarea>
+      </div>
+
+      <!-- Options -->
+      <div class="flex flex-col gap-4">
+        <div>
+          <p class="text-sm font-medium text-gray-400 mb-2">Fuentes</p>
+          <label class="flex items-center gap-2 cursor-pointer select-none mb-2">
+            <input type="checkbox" id="src-reddit" checked
+              class="w-4 h-4 rounded accent-indigo-500 cursor-pointer" />
+            <svg class="w-4 h-4 text-orange-400" viewBox="0 0 20 20" fill="currentColor">
+              <circle cx="10" cy="10" r="10"/>
+              <path fill="#fff" d="M16.67 10a1.46 1.46 0 0 0-2.47-1 7.12 7.12 0 0 0-3.85-1.23l.65-3.06 2.13.45a1 1 0 1 0 .08-.47l-2.37-.5a.2.2 0 0 0-.24.15l-.73 3.44a7.14 7.14 0 0 0-3.89 1.22 1.46 1.46 0 1 0-1.61 2.39 2.9 2.9 0 0 0 0 .4c0 2 2.34 3.64 5.22 3.64s5.22-1.63 5.22-3.64a2.9 2.9 0 0 0 0-.39 1.46 1.46 0 0 0 .76-1.4zm-10 1a1 1 0 1 1 1 1 1 1 0 0 1-1-1zm5.58 2.65a3.56 3.56 0 0 1-2.25.64 3.56 3.56 0 0 1-2.25-.64.2.2 0 0 1 .28-.28 3.19 3.19 0 0 0 2 .53 3.19 3.19 0 0 0 2-.53.2.2 0 1 1 .28.28zm-.13-1.65a1 1 0 1 1 1-1 1 1 0 0 1-1 1z"/>
+            </svg>
+            <span class="text-sm text-gray-300">Reddit</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer select-none">
+            <input type="checkbox" id="src-hn" checked
+              class="w-4 h-4 rounded accent-indigo-500 cursor-pointer" />
+            <svg class="w-4 h-4 text-orange-500" viewBox="0 0 24 24" fill="currentColor">
+              <rect width="24" height="24" rx="3"/><path fill="#fff" d="M12 13.5 7 5h2l3 6 3-6h2l-5 8.5V19h-2z"/>
+            </svg>
+            <span class="text-sm text-gray-300">Hacker News</span>
+          </label>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div class="flex flex-col gap-1">
+            <label class="text-xs text-gray-500" for="f5-reddit-limit">Resultados Reddit</label>
+            <input type="number" id="f5-reddit-limit" value="25" min="5" max="100"
+              class="rounded-lg bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-2
+                     focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent transition" />
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-xs text-gray-500" for="f5-hn-limit">Resultados HN</label>
+            <input type="number" id="f5-hn-limit" value="15" min="5" max="50"
+              class="rounded-lg bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-2
+                     focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent transition" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="flex flex-wrap items-center gap-3">
+      <button
+        id="f5-btn"
+        onclick="startMonitor()"
+        class="inline-flex items-center gap-2 bg-brand hover:bg-brand-dark active:scale-95
+               text-white font-medium px-6 py-2.5 rounded-xl transition-all shadow-md shadow-indigo-900/40"
+      >
+        <svg id="f5-btn-icon" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0 1 18 14.158V11a6 6 0 0 0-5-5.917V5a1 1 0 1 0-2 0v.083A6 6 0 0 0 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 1 1-6 0v-1m6 0H9" />
+        </svg>
+        <span id="f5-btn-label">Buscar menciones</span>
+      </button>
+
+      <button
+        onclick="clearMonitor()"
+        class="inline-flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-gray-300
+               font-medium px-5 py-2.5 rounded-xl transition-all border border-gray-700"
+      >Limpiar</button>
+
+      <div id="f5-status-badge" class="hidden ml-auto"></div>
+    </div>
+  </section>
+
+  <!-- Progress bar -->
+  <div id="f5-progress-wrap" class="hidden space-y-2">
+    <p class="text-sm text-gray-400" id="f5-progress-label">Buscando menciones…</p>
+    <div class="w-full bg-gray-800 rounded-full h-2 overflow-hidden">
+      <div id="f5-progress-bar" class="h-2 bg-brand rounded-full transition-all duration-500" style="width:0%"></div>
+    </div>
+  </div>
+
+  <!-- Error alert -->
+  <div id="f5-error-box" class="hidden bg-red-950 border border-red-700 text-red-300 rounded-xl px-5 py-4 text-sm"></div>
+
+  <!-- Results section -->
+  <section id="f5-results-section" class="hidden space-y-4">
+    <div class="flex items-center justify-between flex-wrap gap-3">
+      <h2 class="text-lg font-semibold text-gray-200">Menciones encontradas</h2>
+      <div class="flex flex-wrap gap-2">
+        <button onclick="filterMentions('all')" id="f5-filter-all"
+          class="f5-filter-btn text-xs px-3 py-1.5 rounded-lg bg-brand text-white font-medium transition">Todos</button>
+        <button onclick="filterMentions('Reddit')" id="f5-filter-Reddit"
+          class="f5-filter-btn text-xs px-3 py-1.5 rounded-lg bg-gray-800 text-gray-400 font-medium hover:bg-gray-700 transition">Reddit</button>
+        <button onclick="filterMentions('Hacker News')" id="f5-filter-Hacker News"
+          class="f5-filter-btn text-xs px-3 py-1.5 rounded-lg bg-gray-800 text-gray-400 font-medium hover:bg-gray-700 transition">Hacker News</button>
+        <button onclick="filterMentions('post')" id="f5-filter-post"
+          class="f5-filter-btn text-xs px-3 py-1.5 rounded-lg bg-gray-800 text-gray-400 font-medium hover:bg-gray-700 transition">Posts</button>
+        <button onclick="filterMentions('comment')" id="f5-filter-comment"
+          class="f5-filter-btn text-xs px-3 py-1.5 rounded-lg bg-gray-800 text-gray-400 font-medium hover:bg-gray-700 transition">Comentarios</button>
+        <button onclick="exportMentionsCSV()"
+          class="text-xs px-3 py-1.5 rounded-lg bg-gray-800 text-gray-400 font-medium hover:bg-gray-700 transition border border-gray-700">↓ CSV</button>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div id="f5-stats" class="grid grid-cols-2 sm:grid-cols-4 gap-3"></div>
+
+    <!-- Cards -->
+    <div id="f5-results-list" class="space-y-3"></div>
+  </section>
+
+</div><!-- /tab-f5bot -->
+
+</main>
+
+<!-- ── Scripts ──────────────────────────────────────────────────── -->
+<script>
+  let allResults = [];
+  let pollInterval = null;
+
+  function getLines(id) {
+    return document.getElementById(id).value
+      .split('\n')
+      .map(s => s.trim())
+      .filter(Boolean);
+  }
+
+  function showError(msg) {
+    const box = document.getElementById('error-box');
+    box.textContent = msg;
+    box.classList.remove('hidden');
+  }
+
+  function hideError() {
+    document.getElementById('error-box').classList.add('hidden');
+  }
+
+  function setStatus(text, color) {
+    const badge = document.getElementById('status-badge');
+    badge.className = `inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-full ${color}`;
+    badge.textContent = text;
+    badge.classList.remove('hidden');
+  }
+
+  function setProgress(pct, label) {
+    const wrap = document.getElementById('progress-wrap');
+    wrap.classList.remove('hidden');
+    document.getElementById('progress-bar').style.width = pct + '%';
+    document.getElementById('progress-label').textContent = label;
+  }
+
+  async function startScrape() {
+    hideError();
+    allResults = [];
+    const domains = getLines('domains');
+    const keywords = getLines('keywords');
+
+    if (!domains.length) { showError('Ingresa al menos un dominio.'); return; }
+    if (!keywords.length) { showError('Ingresa al menos un keyword.'); return; }
+
+    // UI – loading state
+    const btn = document.getElementById('btn-scrape');
+    btn.disabled = true;
+    btn.classList.add('opacity-60', 'cursor-not-allowed');
+    document.getElementById('btn-label').textContent = 'Scrapeando…';
+    document.getElementById('btn-icon').innerHTML = `
+      <path stroke-linecap="round" stroke-linejoin="round" class="animate-spin"
+        d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 100 16 8 8 0 01-8-8z"/>`;
+    document.getElementById('results-section').classList.add('hidden');
+    setProgress(5, `Enviando ${domains.length} dominios…`);
+    setStatus('Corriendo', 'bg-yellow-900/60 text-yellow-300');
+
+    try {
+      const res = await fetch('/api/scrape', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domains, keywords })
+      });
+      const data = await res.json();
+      if (!res.ok) { showError(data.error || 'Error al iniciar el scraping.'); resetBtn(); return; }
+      pollStatus(data.job_id, domains.length);
+    } catch (e) {
+      showError('No se pudo conectar con el servidor.');
+      resetBtn();
+    }
+  }
+
+  function pollStatus(jobId, total) {
+    let dots = 0;
+    pollInterval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/status/${jobId}`);
+        const job = await res.json();
+        const done = job.results?.length || 0;
+        const pct = Math.min(95, 5 + Math.round((done / total) * 90));
+        dots = (dots + 1) % 4;
+        setProgress(pct, `Procesando${'.'.repeat(dots + 1)} (${done}/${total})`);
+
+        if (job.status === 'done' || job.status === 'error') {
+          clearInterval(pollInterval);
+          setProgress(100, 'Completado');
+          allResults = job.results || [];
+          renderResults(allResults);
+          setStatus(`✓ ${allResults.length} sitios analizados`, 'bg-green-900/60 text-green-300');
+          resetBtn('Iniciar nuevo scraping');
+        }
+      } catch (_) { /* ignore transient errors */ }
+    }, 1200);
+  }
+
+  function resetBtn(label = 'Iniciar scraping') {
+    const btn = document.getElementById('btn-scrape');
+    btn.disabled = false;
+    btn.classList.remove('opacity-60', 'cursor-not-allowed');
+    document.getElementById('btn-label').textContent = label;
+    document.getElementById('btn-icon').innerHTML =
+      `<path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M12 5l7 7-7 7" />`;
+  }
+
+  function renderResults(results, filter = 'all') {
+    const section = document.getElementById('results-section');
+    section.classList.remove('hidden');
+
+    const filtered = results.filter(r => {
+      if (filter === 'match') return r.found_keywords?.length > 0;
+      if (filter === 'none') return !r.found_keywords?.length;
+      return true;
+    });
+
+    // Stats
+    const total = results.length;
+    const withMatch = results.filter(r => r.found_keywords?.length > 0).length;
+    const errors = results.filter(r => r.error).length;
+    const allKws = [...new Set(results.flatMap(r => r.found_keywords || []))].length;
+    document.getElementById('stats').innerHTML = `
+      ${stat(total, 'Dominios analizados', 'text-gray-300')}
+      ${stat(withMatch, 'Con coincidencias', 'text-green-400')}
+      ${stat(total - withMatch - errors, 'Sin coincidencias', 'text-yellow-400')}
+      ${stat(errors, 'Con errores', 'text-red-400')}
+    `;
+
+    // Table
+    const tbody = document.getElementById('results-body');
+    if (!filtered.length) {
+      tbody.innerHTML = `<tr><td colspan="6" class="px-4 py-10 text-center text-gray-600">Sin resultados para este filtro.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = filtered.map((r, i) => {
+      const hasKws = r.found_keywords?.length > 0;
+      const kwBadges = (r.found_keywords || []).map(kw =>
+        `<span class="inline-block bg-indigo-900/50 text-indigo-300 border border-indigo-700/50
+                      text-xs font-medium px-2 py-0.5 rounded-full">${escHtml(kw)}</span>`
+      ).join(' ');
+
+      const snippets = Object.entries(r.keyword_matches || {}).flatMap(([kw, snips]) =>
+        snips.map(s => `<p class="text-xs text-gray-500 mt-1"><span class="text-indigo-400 font-medium">[${escHtml(kw)}]</span> ${escHtml(s)}</p>`)
+      ).join('');
+
+      const statusPill = r.status
+        ? `<span class="inline-block text-xs font-mono px-2 py-0.5 rounded-full
+              ${r.status < 300 ? 'bg-green-900/40 text-green-400' : 'bg-red-900/40 text-red-400'}">${r.status}</span>`
+        : '<span class="text-gray-600">—</span>';
+
+      return `
+        <tr class="hover:bg-gray-800/40 transition-colors ${hasKws ? '' : 'opacity-70'}">
+          <td class="px-4 py-3 text-gray-600 text-xs">${i + 1}</td>
+          <td class="px-4 py-3">
+            <a href="${escHtml(r.url)}" target="_blank" rel="noopener noreferrer"
+               class="text-brand-light hover:underline font-medium">${escHtml(r.domain)}</a>
+          </td>
+          <td class="px-4 py-3">${statusPill}</td>
+          <td class="px-4 py-3 space-x-1">${kwBadges || '<span class="text-gray-600 text-xs">ninguno</span>'}</td>
+          <td class="px-4 py-3 max-w-xs">${snippets || '<span class="text-gray-700 text-xs">—</span>'}</td>
+          <td class="px-4 py-3 text-red-400 text-xs">${r.error ? escHtml(r.error) : ''}</td>
+        </tr>`;
+    }).join('');
+  }
+
+  function stat(value, label, color) {
+    return `
+      <div class="bg-gray-800/60 border border-gray-700/50 rounded-xl px-4 py-3">
+        <p class="text-2xl font-bold ${color}">${value}</p>
+        <p class="text-xs text-gray-500 mt-0.5">${label}</p>
+      </div>`;
+  }
+
+  function filterResults(f) {
+    document.querySelectorAll('.filter-btn').forEach(b => {
+      b.className = b.className.replace('bg-brand text-white', 'bg-gray-800 text-gray-400 hover:bg-gray-700');
+    });
+    const active = document.getElementById('filter-' + f);
+    if (active) active.className = active.className
+      .replace('bg-gray-800 text-gray-400 hover:bg-gray-700', 'bg-brand text-white');
+    renderResults(allResults, f);
+  }
+
+  function clearAll() {
+    document.getElementById('domains').value = '';
+    document.getElementById('keywords').value = '';
+    document.getElementById('results-section').classList.add('hidden');
+    document.getElementById('progress-wrap').classList.add('hidden');
+    document.getElementById('status-badge').classList.add('hidden');
+    hideError();
+    allResults = [];
+  }
+
+  function exportCSV() {
+    if (!allResults.length) return;
+    const rows = [['Dominio', 'URL', 'HTTP Status', 'Keywords encontrados', 'Error']];
+    allResults.forEach(r => {
+      rows.push([
+        r.domain,
+        r.url,
+        r.status || '',
+        (r.found_keywords || []).join('; '),
+        r.error || ''
+      ]);
+    });
+    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `scraper_leads_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+  }
+
+  function escHtml(str) {
+    return String(str ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  // ── Tab switching ────────────────────────────────────────────────
+  function switchTab(name) {
+    ['scraper', 'f5bot'].forEach(t => {
+      document.getElementById('tab-' + t).classList.toggle('hidden', t !== name);
+      const btn = document.getElementById('tab-btn-' + t);
+      if (t === name) {
+        btn.classList.add('border-brand', 'text-brand');
+        btn.classList.remove('border-transparent', 'text-gray-500', 'hover:text-gray-300');
+      } else {
+        btn.classList.remove('border-brand', 'text-brand');
+        btn.classList.add('border-transparent', 'text-gray-500', 'hover:text-gray-300');
+      }
+    });
+  }
+
+  // ── F5Bot Monitor ────────────────────────────────────────────────
+  let allMentions = [];
+  let f5PollInterval = null;
+
+  function f5ShowError(msg) {
+    const box = document.getElementById('f5-error-box');
+    box.textContent = msg;
+    box.classList.remove('hidden');
+  }
+  function f5HideError() { document.getElementById('f5-error-box').classList.add('hidden'); }
+
+  function f5SetStatus(text, color) {
+    const badge = document.getElementById('f5-status-badge');
+    badge.className = `inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-full ${color}`;
+    badge.textContent = text;
+    badge.classList.remove('hidden');
+  }
+
+  function f5SetProgress(pct, label) {
+    document.getElementById('f5-progress-wrap').classList.remove('hidden');
+    document.getElementById('f5-progress-bar').style.width = pct + '%';
+    document.getElementById('f5-progress-label').textContent = label;
+  }
+
+  function f5ResetBtn(label = 'Buscar menciones') {
+    const btn = document.getElementById('f5-btn');
+    btn.disabled = false;
+    btn.classList.remove('opacity-60', 'cursor-not-allowed');
+    document.getElementById('f5-btn-label').textContent = label;
+    document.getElementById('f5-btn-icon').innerHTML =
+      `<path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0 1 18 14.158V11a6 6 0 0 0-5-5.917V5a1 1 0 1 0-2 0v.083A6 6 0 0 0 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 1 1-6 0v-1m6 0H9" />`;
+  }
+
+  async function startMonitor() {
+    f5HideError();
+    allMentions = [];
+    const keywords = getLines('f5-keywords');
+    const sources = [];
+    if (document.getElementById('src-reddit').checked) sources.push('reddit');
+    if (document.getElementById('src-hn').checked) sources.push('hn');
+    const redditLimit = parseInt(document.getElementById('f5-reddit-limit').value) || 25;
+    const hnLimit = parseInt(document.getElementById('f5-hn-limit').value) || 15;
+
+    if (!keywords.length) { f5ShowError('Ingresa al menos un keyword.'); return; }
+    if (!sources.length) { f5ShowError('Selecciona al menos una fuente.'); return; }
+
+    const btn = document.getElementById('f5-btn');
+    btn.disabled = true;
+    btn.classList.add('opacity-60', 'cursor-not-allowed');
+    document.getElementById('f5-btn-label').textContent = 'Buscando…';
+    document.getElementById('f5-btn-icon').innerHTML =
+      `<path stroke-linecap="round" stroke-linejoin="round" class="animate-spin"
+        d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 100 16 8 8 0 01-8-8z"/>`;
+    document.getElementById('f5-results-section').classList.add('hidden');
+    f5SetProgress(5, `Buscando ${keywords.length} keyword(s) en ${sources.join(' + ')}…`);
+    f5SetStatus('Buscando', 'bg-yellow-900/60 text-yellow-300');
+
+    try {
+      const res = await fetch('/api/monitor', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keywords, sources, reddit_limit: redditLimit, hn_limit: hnLimit })
+      });
+      const data = await res.json();
+      if (!res.ok) { f5ShowError(data.error || 'Error al iniciar la búsqueda.'); f5ResetBtn(); return; }
+      f5PollStatus(data.job_id, keywords.length);
+    } catch (e) {
+      f5ShowError('No se pudo conectar con el servidor.');
+      f5ResetBtn();
+    }
+  }
+
+  function f5PollStatus(jobId, kwCount) {
+    let dots = 0;
+    f5PollInterval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/status/${jobId}`);
+        const job = await res.json();
+        dots = (dots + 1) % 4;
+        f5SetProgress(
+          job.status === 'done' ? 100 : Math.min(90, 10 + dots * 20),
+          `Buscando menciones${'.'.repeat(dots + 1)}`
+        );
+
+        if (job.status === 'done' || job.status === 'error') {
+          clearInterval(f5PollInterval);
+          f5SetProgress(100, 'Completado');
+          allMentions = job.results || [];
+          renderMentions(allMentions);
+          f5SetStatus(`✓ ${allMentions.length} menciones encontradas`, 'bg-green-900/60 text-green-300');
+          f5ResetBtn('Nueva búsqueda');
+          if (job.errors?.length) {
+            f5ShowError('Advertencias: ' + job.errors.join(' | '));
+          }
+        }
+      } catch (_) { /* ignore */ }
+    }, 1500);
+  }
+
+  function renderMentions(mentions, filter = 'all') {
+    const section = document.getElementById('f5-results-section');
+    section.classList.remove('hidden');
+
+    const filtered = mentions.filter(m => {
+      if (filter === 'all') return true;
+      return m.platform === filter || m.type === filter;
+    });
+
+    // Stats
+    const reddit = mentions.filter(m => m.platform === 'Reddit').length;
+    const hn = mentions.filter(m => m.platform === 'Hacker News').length;
+    const posts = mentions.filter(m => m.type === 'post' || m.type === 'story').length;
+    const comments = mentions.filter(m => m.type === 'comment').length;
+    document.getElementById('f5-stats').innerHTML = `
+      ${stat(mentions.length, 'Total menciones', 'text-gray-300')}
+      ${stat(reddit, 'Reddit', 'text-orange-400')}
+      ${stat(hn, 'Hacker News', 'text-orange-500')}
+      ${stat(posts + comments, 'Posts + Comentarios', 'text-indigo-400')}
+    `;
+
+    const list = document.getElementById('f5-results-list');
+    if (!filtered.length) {
+      list.innerHTML = `<div class="text-center text-gray-600 py-12 text-sm">Sin menciones para este filtro.</div>`;
+      return;
+    }
+
+    list.innerHTML = filtered.map(m => {
+      const isReddit = m.platform === 'Reddit';
+      const platformColor = isReddit ? 'text-orange-400' : 'text-orange-500';
+      const platformBg = isReddit ? 'bg-orange-950/40 border-orange-800/40' : 'bg-orange-950/30 border-orange-900/40';
+      const typeBadge = m.type === 'comment'
+        ? 'bg-blue-900/40 text-blue-400 border-blue-700/30'
+        : 'bg-purple-900/40 text-purple-400 border-purple-700/30';
+
+      const date = m.created_utc
+        ? new Date(m.created_utc * 1000).toLocaleDateString('es-MX', { year:'numeric', month:'short', day:'numeric' })
+        : '';
+
+      const kwBadge = `<span class="inline-block bg-indigo-900/50 text-indigo-300 border border-indigo-700/50
+                            text-xs font-medium px-2 py-0.5 rounded-full">${escHtml(m.keyword)}</span>`;
+
+      const subredditBadge = m.subreddit
+        ? `<span class="text-xs text-gray-500">r/${escHtml(m.subreddit)}</span>` : '';
+
+      return `
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 hover:border-gray-700 transition-colors">
+          <div class="flex items-start justify-between gap-3 flex-wrap">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="inline-flex items-center gap-1 text-xs font-semibold ${platformColor} ${platformBg}
+                           border px-2.5 py-1 rounded-full">${escHtml(m.platform)}</span>
+              <span class="inline-block text-xs border ${typeBadge} px-2 py-0.5 rounded-full">${escHtml(m.type)}</span>
+              ${kwBadge}
+              ${subredditBadge}
+            </div>
+            <div class="flex items-center gap-3 text-xs text-gray-600">
+              ${m.score ? `<span>▲ ${m.score}</span>` : ''}
+              ${date ? `<span>${date}</span>` : ''}
+            </div>
+          </div>
+          <p class="mt-2.5 text-sm font-medium text-gray-200 leading-snug">${escHtml(m.title)}</p>
+          ${m.snippet ? `<p class="mt-1.5 text-xs text-gray-500 leading-relaxed line-clamp-3">${escHtml(m.snippet)}</p>` : ''}
+          <div class="mt-3">
+            <a href="${escHtml(m.url)}" target="_blank" rel="noopener noreferrer"
+               class="text-xs text-brand-light hover:underline inline-flex items-center gap-1">
+              Ver publicación
+              <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+              </svg>
+            </a>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  function filterMentions(f) {
+    document.querySelectorAll('.f5-filter-btn').forEach(b => {
+      b.className = b.className.replace('bg-brand text-white', 'bg-gray-800 text-gray-400 hover:bg-gray-700');
+    });
+    // Map filter value to element id (spaces replaced with underscore workaround: use data attr)
+    const safeId = 'f5-filter-' + f.replace(/ /g, ' ');
+    const active = document.getElementById(safeId);
+    if (active) active.className = active.className
+      .replace('bg-gray-800 text-gray-400 hover:bg-gray-700', 'bg-brand text-white');
+    renderMentions(allMentions, f);
+  }
+
+  function clearMonitor() {
+    document.getElementById('f5-keywords').value = '';
+    document.getElementById('f5-results-section').classList.add('hidden');
+    document.getElementById('f5-progress-wrap').classList.add('hidden');
+    document.getElementById('f5-status-badge').classList.add('hidden');
+    f5HideError();
+    allMentions = [];
+  }
+
+  function exportMentionsCSV() {
+    if (!allMentions.length) return;
+    const rows = [['Platform', 'Type', 'Keyword', 'Title', 'Author', 'Subreddit', 'Score', 'URL', 'Date']];
+    allMentions.forEach(m => {
+      const date = m.created_utc
+        ? new Date(m.created_utc * 1000).toISOString().slice(0, 10) : '';
+      rows.push([m.platform, m.type, m.keyword, m.title, m.author, m.subreddit, m.score, m.url, date]);
+    });
+    const csv = rows.map(r => r.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `f5bot_mentions_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+  }
+</script>
+</body>
+</html>
