@@ -1,13 +1,42 @@
 import uuid
 import threading
+import json
+import os
 from flask import Flask, render_template, request, jsonify
 from scraper import scrape_domains
 from f5bot import monitor_keywords
 
 app = Flask(__name__)
 
-# In-memory job store { job_id: { status, results, errors } }
-jobs: dict = {}
+# File-based job store — works across multiple gunicorn workers
+_JOBS_DIR = os.path.join(os.environ.get("TMPDIR", "/tmp"), "scraper_jobs")
+os.makedirs(_JOBS_DIR, exist_ok=True)
+
+
+def _job_path(job_id: str) -> str:
+    return os.path.join(_JOBS_DIR, f"{job_id}.json")
+
+
+def _get_job(job_id: str) -> dict | None:
+    try:
+        with open(_job_path(job_id)) as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return None
+
+
+def _save_job(job_id: str, data: dict) -> None:
+    path = _job_path(job_id)
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(data, f)
+    os.replace(tmp, path)  # atomic write
+
+
+def _update_job(job_id: str, **kwargs) -> None:
+    job = _get_job(job_id) or {}
+    job.update(kwargs)
+    _save_job(job_id, job)
 
 
 @app.route("/")
@@ -32,7 +61,7 @@ def start_scrape():
         return jsonify({"error": "Debes ingresar al menos un keyword."}), 400
 
     job_id = str(uuid.uuid4())
-    jobs[job_id] = {"status": "running", "results": [], "errors": []}
+    _save_job(job_id, {"status": "running", "results": [], "errors": []})
 
     thread = threading.Thread(
         target=_run_job, args=(job_id, raw_domains, raw_keywords), daemon=True
@@ -45,17 +74,17 @@ def start_scrape():
 def _run_job(job_id: str, domains: list[str], keywords: list[str]) -> None:
     try:
         results, errors = scrape_domains(domains, keywords)
-        jobs[job_id]["results"] = results
-        jobs[job_id]["errors"] = errors
-        jobs[job_id]["status"] = "done"
+        _update_job(job_id, results=results, errors=errors, status="done")
     except Exception as exc:  # noqa: BLE001
-        jobs[job_id]["status"] = "error"
-        jobs[job_id]["errors"].append(str(exc))
+        job = _get_job(job_id) or {}
+        job["status"] = "error"
+        job.setdefault("errors", []).append(str(exc))
+        _save_job(job_id, job)
 
 
 @app.route("/api/status/<job_id>")
 def job_status(job_id: str):
-    job = jobs.get(job_id)
+    job = _get_job(job_id)
     if not job:
         return jsonify({"error": "Job no encontrado."}), 404
     return jsonify(job)
@@ -84,7 +113,7 @@ def start_monitor():
     hn_limit = min(int(data.get("hn_limit", 15)), 50)
 
     job_id = str(uuid.uuid4())
-    jobs[job_id] = {"status": "running", "results": [], "errors": [], "type": "monitor"}
+    _save_job(job_id, {"status": "running", "results": [], "errors": [], "type": "monitor"})
 
     thread = threading.Thread(
         target=_run_monitor_job,
@@ -108,12 +137,12 @@ def _run_monitor_job(
             keywords, sources=sources,
             reddit_limit=reddit_limit, hn_limit=hn_limit,
         )
-        jobs[job_id]["results"] = results
-        jobs[job_id]["errors"] = errors
-        jobs[job_id]["status"] = "done"
+        _update_job(job_id, results=results, errors=errors, status="done")
     except Exception as exc:  # noqa: BLE001
-        jobs[job_id]["status"] = "error"
-        jobs[job_id]["errors"].append(str(exc))
+        job = _get_job(job_id) or {}
+        job["status"] = "error"
+        job.setdefault("errors", []).append(str(exc))
+        _save_job(job_id, job)
 
 
 if __name__ == "__main__":
