@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Scraper de Leads</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: { DEFAULT: '#6366f1', dark: '#4f46e5', light: '#a5b4fc' }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="min-h-full bg-gray-950 text-gray-100 font-sans">
+
+<!-- Header -->
+<header class="bg-gray-900 border-b border-gray-800 shadow-lg">
+  <div class="max-w-6xl mx-auto px-6 py-4 flex items-center gap-3">
+    <svg class="w-7 h-7 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+      <path stroke-linecap="round" stroke-linejoin="round"
+        d="M12 2a10 10 0 1 1 0 20A10 10 0 0 1 12 2zm0 0v4m0 14v-4m10-6h-4M6 12H2m14.243-6.243-2.829 2.829M8.586 15.414l-2.829 2.829m12.728 0-2.829-2.829M8.586 8.586 5.757 5.757" />
+    </svg>
+    <h1 class="text-xl font-semibold tracking-tight">Scraper de Leads</h1>
+  </div>
+</header>
+
+<!-- Tabs -->
+<div class="bg-gray-900 border-b border-gray-800">
+  <div class="max-w-6xl mx-auto px-6 flex gap-1">
+    <button id="tab-btn-scraper" onclick="switchTab('scraper')"
+      class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-brand text-brand transition-colors">
+      Scraper Web
+    </button>
+    <button id="tab-btn-f5bot" onclick="switchTab('f5bot')"
+      class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-300 transition-colors">
+      Monitor F5Bot
+      <span class="ml-1.5 inline-block text-xs bg-indigo-900/60 text-indigo-300 border border-indigo-700/40 px-1.5 py-0.5 rounded-full">Reddit · HN</span>
+    </button>
+  </div>
+</div>
+
+<!-- Main -->
+<main class="max-w-6xl mx-auto px-6 py-10 space-y-8">
+
+  <!-- ═══════════════════════ TAB: SCRAPER WEB ═══════════════════════ -->
+  <section id="tab-scraper" class="space-y-6">
+
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 space-y-6">
+      <h2 class="text-lg font-semibold text-gray-100">Configurar búsqueda</h2>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="space-y-2">
+          <label class="block text-sm font-medium text-gray-300">
+            Dominios <span class="text-gray-500 font-normal">(uno por línea)</span>
+          </label>
+          <textarea id="scraper-domains" rows="8"
+            placeholder="ejemplo.com&#10;otrodominio.mx&#10;https://sitio.org"
+            class="w-full rounded-xl bg-gray-800 border border-gray-700 text-gray-100 text-sm px-4 py-3 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-brand/50 focus:border-brand resize-none"></textarea>
+        </div>
+
+        <div class="space-y-2">
+          <label class="block text-sm font-medium text-gray-300">
+            Keywords <span class="text-gray-500 font-normal">(uno por línea)</span>
+          </label>
+          <textarea id="scraper-keywords" rows="8"
+            placeholder="contacto&#10;ventas&#10;cotización&#10;WhatsApp"
+            class="w-full rounded-xl bg-gray-800 border border-gray-700 text-gray-100 text-sm px-4 py-3 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-brand/50 focus:border-brand resize-none"></textarea>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <button onclick="startScrape()"
+          class="flex items-center gap-2 bg-brand hover:bg-brand-dark text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+          </svg>
+          Iniciar scraping
+        </button>
+        <button onclick="clearScraper()"
+          class="text-sm text-gray-400 hover:text-gray-200 border border-gray-700 hover:border-gray-500 px-4 py-2.5 rounded-xl transition-colors">
+          Limpiar
+        </button>
+      </div>
+    </div>
+
+    <!-- Status + Results -->
+    <div id="scraper-status" class="hidden bg-gray-900 border border-gray-800 rounded-2xl p-6 space-y-4">
+      <div class="flex items-center justify-between flex-wrap gap-3">
+        <div class="flex items-center gap-3">
+          <span id="scraper-spinner" class="inline-block w-4 h-4 border-2 border-brand border-t-transparent rounded-full animate-spin"></span>
+          <span id="scraper-status-text" class="text-sm text-gray-300">Iniciando…</span>
+        </div>
+        <div id="scraper-export-btns" class="hidden flex items-center gap-2">
+          <span class="text-xs text-gray-500">Exportar:</span>
+          <a id="scraper-export-csv" href="#"
+            class="text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 px-3 py-1.5 rounded-lg transition-colors">
+            ↓ CSV
+          </a>
+          <a id="scraper-export-excel" href="#"
+            class="text-xs bg-green-900/50 hover:bg-green-900 border border-green-700/50 text-green-300 px-3 py-1.5 rounded-lg transition-colors">
+            ↓ Excel
+          </a>
+        </div>
+      </div>
+      <div id="scraper-results" class="space-y-4"></div>
+    </div>
+
+  </section>
+
+  <!-- ═══════════════════════ TAB: F5BOT ═══════════════════════ -->
+  <section id="tab-f5bot" class="hidden space-y-6">
+
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 space-y-6">
+      <div>
+        <h2 class="text-lg font-semibold text-gray-100">Monitor F5Bot</h2>
+        <p class="text-sm text-gray-500 mt-1">
+          Busca menciones de tus keywords en Reddit y Hacker News en tiempo real.
+          Ideal para encontrar potenciales clientes que preguntan sobre tus servicios.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="space-y-2">
+          <label class="block text-sm font-medium text-gray-300">
+            Keywords <span class="text-gray-500 font-normal">(uno por línea)</span>
+          </label>
+          <textarea id="f5bot-keywords" rows="6"
+            placeholder="agencia de marketing&#10;diseño web&#10;necesito desarrollador"
+            class="w-full rounded-xl bg-gray-800 border border-gray-700 text-gray-100 text-sm px-4 py-3 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-brand/50 focus:border-brand resize-none"></textarea>
+        </div>
+
+        <div class="space-y-4">
+          <div class="space-y-2">
+            <label class="block text-sm font-medium text-gray-300">Fuentes</label>
+            <div class="flex flex-col gap-2">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" id="src-reddit" checked
+                  class="w-4 h-4 rounded text-brand bg-gray-800 border-gray-600 focus:ring-brand/40" />
+                <span class="text-sm text-gray-300">Reddit</span>
+              </label>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" id="src-hn" checked
+                  class="w-4 h-4 rounded text-brand bg-gray-800 border-gray-600 focus:ring-brand/40" />
+                <span class="text-sm text-gray-300">Hacker News</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div class="space-y-1">
+              <label class="text-xs text-gray-400">Límite Reddit</label>
+              <input type="number" id="reddit-limit" value="25" min="1" max="100"
+                class="w-full rounded-lg bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand/50" />
+            </div>
+            <div class="space-y-1">
+              <label class="text-xs text-gray-400">Límite HN</label>
+              <input type="number" id="hn-limit" value="15" min="1" max="50"
+                class="w-full rounded-lg bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand/50" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <button onclick="startMonitor()"
+          class="flex items-center gap-2 bg-brand hover:bg-brand-dark text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 00-5-5.917V4a1 1 0 10-2 0v1.083A6 6 0 006 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+          </svg>
+          Buscar menciones
+        </button>
+        <button onclick="clearMonitor()"
+          class="text-sm text-gray-400 hover:text-gray-200 border border-gray-700 hover:border-gray-500 px-4 py-2.5 rounded-xl transition-colors">
+          Limpiar
+        </button>
+      </div>
+    </div>
+
+    <!-- Status + Results -->
+    <div id="monitor-status" class="hidden bg-gray-900 border border-gray-800 rounded-2xl p-6 space-y-4">
+      <div class="flex items-center justify-between flex-wrap gap-3">
+        <div class="flex items-center gap-3">
+          <span id="monitor-spinner" class="inline-block w-4 h-4 border-2 border-brand border-t-transparent rounded-full animate-spin"></span>
+          <span id="monitor-status-text" class="text-sm text-gray-300">Buscando…</span>
+        </div>
+        <div id="monitor-export-btns" class="hidden flex items-center gap-2">
+          <span class="text-xs text-gray-500">Exportar:</span>
+          <a id="monitor-export-csv" href="#"
+            class="text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 px-3 py-1.5 rounded-lg transition-colors">
+            ↓ CSV
+          </a>
+          <a id="monitor-export-excel" href="#"
+            class="text-xs bg-green-900/50 hover:bg-green-900 border border-green-700/50 text-green-300 px-3 py-1.5 rounded-lg transition-colors">
+            ↓ Excel
+          </a>
+        </div>
+      </div>
+      <div id="monitor-results" class="space-y-3"></div>
+    </div>
+
+  </section>
+
+</main>
+
+<script>
+// ── Tabs ───────────────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('[id^="tab-"]').forEach(el => {
+    if (el.tagName === 'SECTION') el.classList.add('hidden');
+  });
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.classList.remove('border-brand', 'text-brand');
+    btn.classList.add('border-transparent', 'text-gray-500');
+  });
+  document.getElementById('tab-' + tab).classList.remove('hidden');
+  const activeBtn = document.getElementById('tab-btn-' + tab);
+  activeBtn.classList.add('border-brand', 'text-brand');
+  activeBtn.classList.remove('border-transparent', 'text-gray-500');
+}
+
+// ── Polling ────────────────────────────────────────────────────────────────────
+async function pollJob(jobId, onDone, onError) {
+  const poll = async () => {
+    const res = await fetch(`/api/status/${jobId}`);
+    const job = await res.json();
+    if (job.status === 'done') { onDone(job); return; }
+    if (job.status === 'error') { onError(job); return; }
+    setTimeout(poll, 1500);
+  };
+  poll();
+}
+
+// ── Scraper ────────────────────────────────────────────────────────────────────
+async function startScrape() {
+  const domains = document.getElementById('scraper-domains').value
+    .split('\n').map(s => s.trim()).filter(Boolean);
+  const keywords = document.getElementById('scraper-keywords').value
+    .split('\n').map(s => s.trim()).filter(Boolean);
+
+  const statusBox = document.getElementById('scraper-status');
+  const spinner   = document.getElementById('scraper-spinner');
+  const statusTxt = document.getElementById('scraper-status-text');
+  const resultsEl = document.getElementById('scraper-results');
+
+  statusBox.classList.remove('hidden');
+  spinner.classList.remove('hidden');
+  resultsEl.innerHTML = '';
+  statusTxt.textContent = 'Iniciando scraping…';
+
+  const res = await fetch('/api/scrape', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ domains, keywords }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json();
+    statusTxt.textContent = '✗ ' + (err.detail || 'Error');
+    spinner.classList.add('hidden');
+    return;
+  }
+
+  const { job_id } = await res.json();
+  statusTxt.textContent = `Job iniciado · ID: ${job_id}`;
+
+  pollJob(job_id,
+    job => {
+      spinner.classList.add('hidden');
+      statusTxt.textContent = `Scraping completo · ${job.results.length} dominio(s) procesado(s)`;
+      renderScraperResults(job.results, job.errors, resultsEl);
+      document.getElementById('scraper-export-csv').href = `/api/export/${job_id}?format=csv`;
+      document.getElementById('scraper-export-excel').href = `/api/export/${job_id}?format=excel`;
+      document.getElementById('scraper-export-btns').classList.remove('hidden');
+    },
+    job => {
+      spinner.classList.add('hidden');
+      statusTxt.textContent = '✗ Error en el job';
+      resultsEl.innerHTML = `<p class="text-red-400 text-sm">${(job.errors || []).join('<br>')}</p>`;
+    }
+  );
+}
+
+function renderScraperResults(results, errors, container) {
+  if (errors && errors.length) {
+    container.insertAdjacentHTML('beforeend', `
+      <div class="bg-red-950/40 border border-red-800/40 rounded-xl p-4">
+        <p class="text-xs font-semibold text-red-400 mb-2">Errores</p>
+        ${errors.map(e => `<p class="text-xs text-red-300">${e}</p>`).join('')}
+      </div>`);
+  }
+
+  results.forEach(r => {
+    const hasLeads = r.has_leads;
+    const badge = hasLeads
+      ? '<span class="text-xs bg-green-900/50 text-green-400 border border-green-700/40 px-2 py-0.5 rounded-full">Leads encontrados</span>'
+      : '<span class="text-xs bg-gray-800 text-gray-500 border border-gray-700 px-2 py-0.5 rounded-full">Sin leads</span>';
+
+    const emailsHtml = r.emails.length
+      ? r.emails.map(e => `<a href="mailto:${e}" class="text-brand hover:underline">${e}</a>`).join(', ')
+      : '<span class="text-gray-600">—</span>';
+
+    const phonesHtml = r.phones.length
+      ? r.phones.map(p => `<span class="text-gray-300">${p}</span>`).join(', ')
+      : '<span class="text-gray-600">—</span>';
+
+    const waNumHtml = (r.whatsapp_numbers || []).length
+      ? (r.whatsapp_numbers || []).map(n => `<a href="https://wa.me/${n.replace(/\D/g,'')}" target="_blank" rel="noopener noreferrer"
+          class="inline-flex items-center gap-1 text-xs bg-green-900/50 text-green-300 border border-green-700/40 px-2 py-1 rounded-lg hover:bg-green-900 transition-colors">
+          💬 ${n}</a>`).join(' ')
+      : '<span class="text-gray-600">—</span>';
+
+    const socials = r.socials || {};
+    const socialIcons = { whatsapp: '💬', linkedin: '💼', instagram: '📸', facebook: '📘', twitter: '🐦' };
+    const socialsHtml = Object.entries(socials).length
+      ? Object.entries(socials).map(([net, urls]) =>
+          urls.map(u => `<a href="${u}" target="_blank" rel="noopener noreferrer"
+            class="text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 px-2 py-1 rounded-lg transition-colors">
+            ${socialIcons[net] || '🔗'} ${net}</a>`).join('')
+        ).join('')
+      : '<span class="text-gray-600">—</span>';
+
+    const kwHtml = r.keywords_found.length
+      ? r.keywords_found.map(k => `<span class="text-xs bg-indigo-900/50 text-indigo-300 border border-indigo-700/40 px-2 py-0.5 rounded-full">${k}</span>`).join(' ')
+      : '<span class="text-gray-600">—</span>';
+
+    const techHtml = (r.technologies || []).length
+      ? (r.technologies || []).map(t => `<span class="text-xs bg-gray-700/60 text-gray-400 border border-gray-600 px-2 py-0.5 rounded-full">${t}</span>`).join(' ')
+      : '<span class="text-gray-600">—</span>';
+
+    const addressHtml = r.address
+      ? `<span class="text-gray-300">📍 ${r.address}</span>`
+      : '<span class="text-gray-600">—</span>';
+
+    const descHtml = r.description
+      ? `<p class="text-xs text-gray-500 mt-1 line-clamp-2">${r.description}</p>`
+      : '';
+
+    container.insertAdjacentHTML('beforeend', `
+      <div class="bg-gray-800/50 border border-gray-700 rounded-xl p-5 space-y-3">
+        <div class="flex items-start justify-between flex-wrap gap-2">
+          <div>
+            <a href="${r.domain}" target="_blank" rel="noopener noreferrer"
+              class="text-sm font-semibold text-brand hover:underline">${r.domain}</a>
+            ${r.company_name ? `<p class="text-xs text-gray-400 mt-0.5 font-medium">${r.company_name}</p>` : ''}
+            ${descHtml}
+          </div>
+          ${badge}
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+          <div><span class="text-gray-500 text-xs uppercase tracking-wide">Emails</span><br>${emailsHtml}</div>
+          <div><span class="text-gray-500 text-xs uppercase tracking-wide">Teléfonos</span><br>${phonesHtml}</div>
+        </div>
+        <div><span class="text-gray-500 text-xs uppercase tracking-wide">WhatsApp</span><br><div class="flex flex-wrap gap-1.5 mt-1">${waNumHtml}</div></div>
+        <div><span class="text-gray-500 text-xs uppercase tracking-wide">Redes sociales</span><br><div class="flex flex-wrap gap-1.5 mt-1">${socialsHtml}</div></div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div><span class="text-gray-500 text-xs uppercase tracking-wide">Dirección</span><br><div class="text-xs mt-1">${addressHtml}</div></div>
+          <div><span class="text-gray-500 text-xs uppercase tracking-wide">Tecnologías</span><br><div class="flex flex-wrap gap-1.5 mt-1">${techHtml}</div></div>
+        </div>
+        <div><span class="text-gray-500 text-xs uppercase tracking-wide">Keywords hallados</span><br><div class="flex flex-wrap gap-1.5 mt-1">${kwHtml}</div></div>
+        <p class="text-xs text-gray-600">${r.pages_scraped} página(s) escaneada(s)</p>
+      </div>`);
+  });
+}
+
+function clearScraper() {
+  document.getElementById('scraper-domains').value = '';
+  document.getElementById('scraper-keywords').value = '';
+  document.getElementById('scraper-status').classList.add('hidden');
+  document.getElementById('scraper-results').innerHTML = '';
+  document.getElementById('scraper-export-btns').classList.add('hidden');
+}
+
+// ── Monitor ────────────────────────────────────────────────────────────────────
+async function startMonitor() {
+  const keywords = document.getElementById('f5bot-keywords').value
+    .split('\n').map(s => s.trim()).filter(Boolean);
+  const sources = [];
+  if (document.getElementById('src-reddit').checked) sources.push('reddit');
+  if (document.getElementById('src-hn').checked) sources.push('hn');
+  const reddit_limit = parseInt(document.getElementById('reddit-limit').value) || 25;
+  const hn_limit     = parseInt(document.getElementById('hn-limit').value) || 15;
+
+  const statusBox = document.getElementById('monitor-status');
+  const spinner   = document.getElementById('monitor-spinner');
+  const statusTxt = document.getElementById('monitor-status-text');
+  const resultsEl = document.getElementById('monitor-results');
+
+  statusBox.classList.remove('hidden');
+  spinner.classList.remove('hidden');
+  resultsEl.innerHTML = '';
+  statusTxt.textContent = 'Buscando menciones…';
+
+  const res = await fetch('/api/monitor', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ keywords, sources, reddit_limit, hn_limit }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json();
+    statusTxt.textContent = '✗ ' + (err.detail || 'Error');
+    spinner.classList.add('hidden');
+    return;
+  }
+
+  const { job_id } = await res.json();
+  statusTxt.textContent = `Monitoreando · ID: ${job_id}`;
+
+  pollJob(job_id,
+    job => {
+      spinner.classList.add('hidden');
+      statusTxt.textContent = `Búsqueda completa · ${job.results.length} mención(es) encontrada(s)`;
+      renderMonitorResults(job.results, job.errors, resultsEl);
+      document.getElementById('monitor-export-csv').href = `/api/export/${job_id}?format=csv`;
+      document.getElementById('monitor-export-excel').href = `/api/export/${job_id}?format=excel`;
+      document.getElementById('monitor-export-btns').classList.remove('hidden');
+    },
+    job => {
+      spinner.classList.add('hidden');
+      statusTxt.textContent = '✗ Error en el job';
+      resultsEl.innerHTML = `<p class="text-red-400 text-sm">${(job.errors || []).join('<br>')}</p>`;
+    }
+  );
+}
+
+function renderMonitorResults(results, errors, container) {
+  if (errors && errors.length) {
+    container.insertAdjacentHTML('beforeend', `
+      <div class="bg-red-950/40 border border-red-800/40 rounded-xl p-4">
+        <p class="text-xs font-semibold text-red-400 mb-2">Errores</p>
+        ${errors.map(e => `<p class="text-xs text-red-300">${e}</p>`).join('')}
+      </div>`);
+  }
+
+  if (!results.length) {
+    container.innerHTML = '<p class="text-sm text-gray-500">No se encontraron menciones.</p>';
+    return;
+  }
+
+  const sourceIcon = { reddit: '🟠', hackernews: '🔶' };
+  const grouped = {};
+  results.forEach(r => {
+    (grouped[r.keyword] = grouped[r.keyword] || []).push(r);
+  });
+
+  Object.entries(grouped).forEach(([kw, posts]) => {
+    let postsHtml = posts.map(p => `
+      <div class="bg-gray-900/60 border border-gray-700/60 rounded-lg p-4 space-y-1.5">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="text-xs">${sourceIcon[p.source] || '📌'} <span class="text-gray-400">${p.source}</span></span>
+          ${p.subreddit ? `<span class="text-xs text-indigo-400">${p.subreddit}</span>` : ''}
+          <span class="text-xs text-gray-600 ml-auto">${p.created}</span>
+        </div>
+        <a href="${p.url}" target="_blank" rel="noopener noreferrer"
+          class="block text-sm font-medium text-gray-100 hover:text-brand transition-colors">${p.title}</a>
+        ${p.selftext_snippet ? `<p class="text-xs text-gray-500 line-clamp-2">${p.selftext_snippet}</p>` : ''}
+        <div class="flex items-center gap-4 text-xs text-gray-600">
+          <span>👤 ${p.author}</span>
+          <span>⬆ ${p.score}</span>
+          <span>💬 ${p.num_comments}</span>
+        </div>
+      </div>`).join('');
+
+    container.insertAdjacentHTML('beforeend', `
+      <div class="space-y-2">
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-semibold bg-indigo-900/50 text-indigo-300 border border-indigo-700/40 px-2 py-0.5 rounded-full">${kw}</span>
+          <span class="text-xs text-gray-600">${posts.length} resultado(s)</span>
+        </div>
+        ${postsHtml}
+      </div>`);
+  });
+}
+
+function clearMonitor() {
+  document.getElementById('f5bot-keywords').value = '';
+  document.getElementById('monitor-status').classList.add('hidden');
+  document.getElementById('monitor-results').innerHTML = '';
+  document.getElementById('monitor-export-btns').classList.add('hidden');
+}
+</script>
+</body>
+</html>
