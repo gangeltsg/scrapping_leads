@@ -2,11 +2,15 @@ import uuid
 import threading
 import json
 import os
-from flask import Flask, render_template, request, jsonify
+from fastapi import FastAPI, Request, HTTPException
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
 from scraper import scrape_domains
 from f5bot import monitor_keywords
 
-app = Flask(__name__)
+app = FastAPI()
+templates = Jinja2Templates(directory="templates")
 
 # File-based job store — works across multiple gunicorn workers
 _JOBS_DIR = os.path.join(os.environ.get("TMPDIR", "/tmp"), "scraper_jobs")
@@ -39,26 +43,29 @@ def _update_job(job_id: str, **kwargs) -> None:
     _save_job(job_id, job)
 
 
-@app.route("/")
-def index():
-    return render_template("index.html")
+@app.get("/", response_class=HTMLResponse)
+async def index(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
 
 
-@app.route("/api/scrape", methods=["POST"])
-def start_scrape():
-    data = request.get_json(force=True)
+class ScrapeRequest(BaseModel):
+    domains: list[str] = []
+    keywords: list[str] = []
 
+
+@app.post("/api/scrape")
+async def start_scrape(data: ScrapeRequest):
     raw_domains: list[str] = [
-        d.strip() for d in data.get("domains", []) if d.strip()
+        d.strip() for d in data.domains if d.strip()
     ]
     raw_keywords: list[str] = [
-        k.strip().lower() for k in data.get("keywords", []) if k.strip()
+        k.strip().lower() for k in data.keywords if k.strip()
     ]
 
     if not raw_domains:
-        return jsonify({"error": "Debes ingresar al menos un dominio."}), 400
+        raise HTTPException(status_code=400, detail="Debes ingresar al menos un dominio.")
     if not raw_keywords:
-        return jsonify({"error": "Debes ingresar al menos un keyword."}), 400
+        raise HTTPException(status_code=400, detail="Debes ingresar al menos un keyword.")
 
     job_id = str(uuid.uuid4())
     _save_job(job_id, {"status": "running", "results": [], "errors": []})
@@ -68,7 +75,7 @@ def start_scrape():
     )
     thread.start()
 
-    return jsonify({"job_id": job_id}), 202
+    return JSONResponse(content={"job_id": job_id}, status_code=202)
 
 
 def _run_job(job_id: str, domains: list[str], keywords: list[str]) -> None:
@@ -82,35 +89,39 @@ def _run_job(job_id: str, domains: list[str], keywords: list[str]) -> None:
         _save_job(job_id, job)
 
 
-@app.route("/api/status/<job_id>")
-def job_status(job_id: str):
+@app.get("/api/status/{job_id}")
+async def job_status(job_id: str):
     job = _get_job(job_id)
     if not job:
-        return jsonify({"error": "Job no encontrado."}), 404
-    return jsonify(job)
+        raise HTTPException(status_code=404, detail="Job no encontrado.")
+    return job
 
 
 # ── F5Bot: Reddit / Hacker News monitoring ───────────────────────
 
-@app.route("/api/monitor", methods=["POST"])
-def start_monitor():
-    data = request.get_json(force=True)
+class MonitorRequest(BaseModel):
+    keywords: list[str] = []
+    sources: list[str] = ["reddit", "hn"]
+    reddit_limit: int = 25
+    hn_limit: int = 15
 
+
+@app.post("/api/monitor")
+async def start_monitor(data: MonitorRequest):
     raw_keywords: list[str] = [
-        k.strip() for k in data.get("keywords", []) if k.strip()
+        k.strip() for k in data.keywords if k.strip()
     ]
     sources: list[str] = [
-        s for s in data.get("sources", ["reddit", "hn"])
-        if s in ("reddit", "hn")
+        s for s in data.sources if s in ("reddit", "hn")
     ]
 
     if not raw_keywords:
-        return jsonify({"error": "Debes ingresar al menos un keyword."}), 400
+        raise HTTPException(status_code=400, detail="Debes ingresar al menos un keyword.")
     if not sources:
-        return jsonify({"error": "Selecciona al menos una fuente (Reddit o HN)."}), 400
+        raise HTTPException(status_code=400, detail="Selecciona al menos una fuente (Reddit o HN).")
 
-    reddit_limit = min(int(data.get("reddit_limit", 25)), 100)
-    hn_limit = min(int(data.get("hn_limit", 15)), 50)
+    reddit_limit = min(data.reddit_limit, 100)
+    hn_limit = min(data.hn_limit, 50)
 
     job_id = str(uuid.uuid4())
     _save_job(job_id, {"status": "running", "results": [], "errors": [], "type": "monitor"})
@@ -122,7 +133,7 @@ def start_monitor():
     )
     thread.start()
 
-    return jsonify({"job_id": job_id}), 202
+    return JSONResponse(content={"job_id": job_id}, status_code=202)
 
 
 def _run_monitor_job(
@@ -146,6 +157,6 @@ def _run_monitor_job(
 
 
 if __name__ == "__main__":
-    import os
+    import uvicorn
     port = int(os.environ.get("PORT", 8001))
-    app.run(debug=False, host="0.0.0.0", port=port)
+    uvicorn.run("app:app", host="0.0.0.0", port=port, reload=False)
