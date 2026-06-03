@@ -100,12 +100,14 @@ class MonitorRequest(BaseModel):
     sources: list[str] = ["reddit", "hn"]
     reddit_limit: int = 25
     hn_limit: int = 15
+    so_limit: int = 10
+    include_comments: bool = True
 
 
 @app.post("/api/monitor")
 async def start_monitor(data: MonitorRequest):
     raw_keywords = [k.strip() for k in data.keywords if k.strip()]
-    sources = [s for s in data.sources if s in ("reddit", "hn")]
+    sources = [s for s in data.sources if s in ("reddit", "hn", "stackoverflow")]
 
     if not raw_keywords:
         raise HTTPException(status_code=400, detail="Debes ingresar al menos un keyword.")
@@ -114,13 +116,15 @@ async def start_monitor(data: MonitorRequest):
 
     reddit_limit = min(data.reddit_limit, 100)
     hn_limit = min(data.hn_limit, 50)
+    so_limit = min(data.so_limit, 50)
+    include_comments = data.include_comments
 
     job_id = str(uuid.uuid4())
     _save_job(job_id, {"status": "running", "results": [], "errors": [], "type": "monitor"})
 
     threading.Thread(
         target=_run_monitor_job,
-        args=(job_id, raw_keywords, sources, reddit_limit, hn_limit),
+        args=(job_id, raw_keywords, sources, reddit_limit, hn_limit, so_limit, include_comments),
         daemon=True,
     ).start()
 
@@ -133,11 +137,14 @@ def _run_monitor_job(
     sources: list[str],
     reddit_limit: int,
     hn_limit: int,
+    so_limit: int = 10,
+    include_comments: bool = True,
 ) -> None:
     try:
         results, errors = monitor_keywords(
             keywords, sources=sources,
             reddit_limit=reddit_limit, hn_limit=hn_limit,
+            so_limit=so_limit, include_comments=include_comments,
         )
         _update_job(job_id, results=results, errors=errors, status="done")
     except Exception as exc:  # noqa: BLE001
@@ -165,8 +172,8 @@ _SCRAPE_HEADERS = [
     "Keywords Encontrados", "Páginas Escaneadas",
 ]
 _MONITOR_HEADERS = [
-    "Fuente", "Keyword", "Título", "URL", "Autor",
-    "Subreddit", "Votos", "Comentarios", "Extracto", "Fecha",
+    "Fuente", "Tipo", "Keyword", "Título", "URL", "Autor", "Perfil Autor",
+    "Subreddit / Tags", "Votos", "Comentarios/Resp.", "Extracto", "Fecha",
 ]
 
 
@@ -193,10 +200,12 @@ def _flatten_scrape(r: dict) -> list:
 def _flatten_monitor(r: dict) -> list:
     return [
         r.get("source", ""),
+        r.get("result_type", "post"),
         r.get("keyword", ""),
         r.get("title", ""),
         r.get("url", ""),
         r.get("author", ""),
+        r.get("author_profile_url", ""),
         r.get("subreddit", ""),
         r.get("score", 0),
         r.get("num_comments", 0),

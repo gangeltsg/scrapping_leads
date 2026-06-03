@@ -145,9 +145,19 @@
                 <span class="text-sm text-gray-300">Reddit</span>
               </label>
               <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" id="include-comments" checked
+                  class="w-4 h-4 rounded text-brand bg-gray-800 border-gray-600 focus:ring-brand/40" />
+                <span class="text-sm text-gray-400 pl-1">↳ Incluir comentarios</span>
+              </label>
+              <label class="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" id="src-hn" checked
                   class="w-4 h-4 rounded text-brand bg-gray-800 border-gray-600 focus:ring-brand/40" />
                 <span class="text-sm text-gray-300">Hacker News</span>
+              </label>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" id="src-stackoverflow"
+                  class="w-4 h-4 rounded text-brand bg-gray-800 border-gray-600 focus:ring-brand/40" />
+                <span class="text-sm text-gray-300">Stack Overflow</span>
               </label>
             </div>
           </div>
@@ -161,6 +171,11 @@
             <div class="space-y-1">
               <label class="text-xs text-gray-400">Límite HN</label>
               <input type="number" id="hn-limit" value="15" min="1" max="50"
+                class="w-full rounded-lg bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand/50" />
+            </div>
+            <div class="space-y-1">
+              <label class="text-xs text-gray-400">Límite Stack Overflow</label>
+              <input type="number" id="so-limit" value="10" min="1" max="50"
                 class="w-full rounded-lg bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand/50" />
             </div>
           </div>
@@ -383,8 +398,11 @@ async function startMonitor() {
   const sources = [];
   if (document.getElementById('src-reddit').checked) sources.push('reddit');
   if (document.getElementById('src-hn').checked) sources.push('hn');
+  if (document.getElementById('src-stackoverflow').checked) sources.push('stackoverflow');
+  const include_comments = document.getElementById('include-comments').checked;
   const reddit_limit = parseInt(document.getElementById('reddit-limit').value) || 25;
   const hn_limit     = parseInt(document.getElementById('hn-limit').value) || 15;
+  const so_limit     = parseInt(document.getElementById('so-limit').value) || 10;
 
   const statusBox = document.getElementById('monitor-status');
   const spinner   = document.getElementById('monitor-spinner');
@@ -399,7 +417,7 @@ async function startMonitor() {
   const res = await fetch('/api/monitor', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ keywords, sources, reddit_limit, hn_limit }),
+    body: JSON.stringify({ keywords, sources, reddit_limit, hn_limit, so_limit, include_comments }),
   });
 
   if (!res.ok) {
@@ -443,29 +461,46 @@ function renderMonitorResults(results, errors, container) {
     return;
   }
 
-  const sourceIcon = { reddit: '🟠', hackernews: '🔶' };
+  const sourceIcon = { reddit: '🟠', hackernews: '🔶', stackoverflow: '🔷' };
   const grouped = {};
   results.forEach(r => {
     (grouped[r.keyword] = grouped[r.keyword] || []).push(r);
   });
 
   Object.entries(grouped).forEach(([kw, posts]) => {
-    let postsHtml = posts.map(p => `
+    let postsHtml = posts.map(p => {
+      const typeBadge = p.result_type === 'comment'
+        ? '<span class="text-xs bg-yellow-900/40 text-yellow-400 border border-yellow-700/40 px-1.5 py-0.5 rounded-full">💬 Comentario</span>'
+        : '<span class="text-xs bg-blue-900/40 text-blue-400 border border-blue-700/40 px-1.5 py-0.5 rounded-full">📝 Post</span>';
+
+      const profileLink = p.author_profile_url
+        ? `<a href="${p.author_profile_url}" target="_blank" rel="noopener noreferrer"
+            class="inline-flex items-center gap-1 text-xs bg-indigo-900/40 text-indigo-300 border border-indigo-700/40 px-2 py-0.5 rounded-full hover:bg-indigo-900 transition-colors">👤 Ver perfil</a>`
+        : '';
+
+      const tagsOrSub = p.subreddit
+        ? `<span class="text-xs text-indigo-400">${p.subreddit}</span>`
+        : '';
+
+      return `
       <div class="bg-gray-900/60 border border-gray-700/60 rounded-lg p-4 space-y-1.5">
         <div class="flex items-center gap-2 flex-wrap">
           <span class="text-xs">${sourceIcon[p.source] || '📌'} <span class="text-gray-400">${p.source}</span></span>
-          ${p.subreddit ? `<span class="text-xs text-indigo-400">${p.subreddit}</span>` : ''}
+          ${typeBadge}
+          ${tagsOrSub}
           <span class="text-xs text-gray-600 ml-auto">${p.created}</span>
         </div>
         <a href="${p.url}" target="_blank" rel="noopener noreferrer"
           class="block text-sm font-medium text-gray-100 hover:text-brand transition-colors">${p.title}</a>
-        ${p.selftext_snippet ? `<p class="text-xs text-gray-500 line-clamp-2">${p.selftext_snippet}</p>` : ''}
-        <div class="flex items-center gap-4 text-xs text-gray-600">
-          <span>👤 ${p.author}</span>
-          <span>⬆ ${p.score}</span>
-          <span>💬 ${p.num_comments}</span>
+        ${p.selftext_snippet ? `<p class="text-xs text-gray-400 line-clamp-3 bg-gray-800/50 rounded px-2 py-1">${p.selftext_snippet}</p>` : ''}
+        <div class="flex items-center gap-3 flex-wrap">
+          <span class="text-xs text-gray-500">👤 ${p.author}</span>
+          ${profileLink}
+          <span class="text-xs text-gray-600">⬆ ${p.score}</span>
+          <span class="text-xs text-gray-600">💬 ${p.num_comments}</span>
         </div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
 
     container.insertAdjacentHTML('beforeend', `
       <div class="space-y-2">
